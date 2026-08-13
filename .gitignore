@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+_tema_yedek_*/
+_tasarim_yedek_oncesi_*/
+data.json
+price_history.json

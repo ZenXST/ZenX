@@ -1,0 +1,6 @@
+Flask
+gunicorn
+requests
+playwright==1.61.0
+pypdf
+beautifulsoup4

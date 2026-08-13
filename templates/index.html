@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ZenX - KO GB Live Tracker</title>
+    <!-- Kayıtlı temayı stiller yüklenmeden ÖNCE uygula: tema değişimi "flash" (FOUC) sorununu önler -->
+    <script>(function(){try{var t=localStorage.getItem('zenx_theme_v2')||'classic';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','classic');}})();</script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 38 38'%3E%3Crect width='38' height='38' rx='6' fill='%2315171c'/%3E%3Cpath d='M6 26l7-7 5 4 6-9 6-6' stroke='%234c7ef0' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='30' cy='8' r='2.6' fill='%234c7ef0'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<div class="ambient-glow"></div>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="app-header">
+    <a class="brand-pill" href="#">
+        <!-- ZenX SVG Logo v2: yükselen fiyat trend çizgisi + parlayan uç noktası (canlı takip temalı yeni marka) -->
+        <svg class="brand-logo-svg" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="lg1" x1="4" y1="30" x2="34" y2="6" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="var(--accent)"/>
+                    <stop offset="100%" stop-color="var(--accent2)"/>
+                </linearGradient>
+                <linearGradient id="lg2" x1="38" y1="0" x2="0" y2="38" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.55"/>
+                    <stop offset="100%" stop-color="var(--accent2)" stop-opacity="0.18"/>
+                </linearGradient>
+            </defs>
+            <!-- Arka plan kare -->
+            <rect width="38" height="38" rx="11" fill="url(#lg2)"/>
+            <rect x="0.75" y="0.75" width="36.5" height="36.5" rx="10.25" stroke="url(#lg1)" stroke-opacity="0.35"/>
+            <!-- Yükselen fiyat/trend çizgisi -->
+            <path d="M6 27l6-6 5 4 6-9 6-7" stroke="url(#lg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Ara nokta vurguları -->
+            <circle cx="12" cy="21" r="1.6" fill="var(--accent)"/>
+            <circle cx="17" cy="25" r="1.6" fill="var(--accent)"/>
+            <circle cx="23" cy="16" r="1.6" fill="var(--accent2)"/>
+            <!-- Parlayan uç noktası -->
+            <circle cx="29" cy="9" r="2.6" fill="var(--accent2)" opacity="0.95"/>
+            <circle cx="29" cy="9" r="4.6" fill="var(--accent2)" opacity="0.18"/>
+        </svg>
+        <div>
+            <div class="brand-name">
+                <span class="zen">Zen</span><span class="x-letter">X</span>
+            </div>
+            <span class="brand-tagline">KO GB Live Tracker</span>
+        </div>
+    </a>
+
+    <div class="header-tools">
+        <select id="themeSelect" class="form-select form-select-sm w-auto" onchange="switchTheme(this.value)" style="min-width:110px;">
+            <option value="classic">◾ Classic</option>
+            <option value="aurora">🌌 Aurora ✦</option>
+            <option value="cyber">⚡ Cyber</option>
+            <option value="oled">🖤 OLED</option>
+            <option value="emerald">🟢 Emerald</option>
+            <option value="nova">🟣 Nova</option>
+            <option value="light">☀️ Light</option>
+        </select>
+
+        <select id="refreshIntervalSelect" class="form-select form-select-sm w-auto d-none d-sm-block" onchange="changeRefreshInterval()" style="min-width:70px;">
+            <option value="15" selected>15s</option>
+            <option value="30">30s</option>
+            <option value="60">1m</option>
+            <option value="180">3m</option>
+        </select>
+
+        <div class="timer-badge">
+            <i class="bi bi-clock-history" style="color:var(--accent);font-size:0.8rem;"></i>
+            <span id="countdown">15</span>s
+        </div>
+
+        <div class="header-badge d-none d-sm-flex">
+            <span class="live-dot"></span>
+            <span>Canlı</span>
+        </div>
+
+        <button class="btn-ghost p-1 px-2" onclick="refreshData()" title="Yenile" style="line-height:1;">
+            <i class="bi bi-arrow-clockwise" style="font-size:1rem;"></i>
+        </button>
+    </div>
+</header>
+
+<!-- ═══════════════ SIDEBAR / BOTTOM NAV ═══════════════ -->
+<nav class="app-nav" id="appNav">
+
+    <button class="nav-pin-btn desktop-only" id="navPinBtn" onclick="toggleSidebarPin()" title="Menüyü sabitle">
+        <i class="bi bi-pin-angle-fill" id="sidebarPinIcon"></i>
+        <span>Sabitle</span>
+    </button>
+
+    <!-- Sayfalar -->
+    <div class="nav-section">Sayfalar</div>
+    <button class="nav-item-btn active" id="navBtnDashboard" onclick="switchPage('dashboard')">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span class="nav-label">Canlı Fiyatlar</span>
+    </button>
+    <button class="nav-item-btn" id="navBtnPdf" onclick="switchPage('pdf')">
+        <i class="bi bi-file-earmark-pdf-fill"></i>
+        <span class="nav-label">Bakiye Hareketleri</span>
+    </button>
+    <!-- Mobilde: tüm araçların açıldığı hızlı erişim sayfası (masaüstünde gizli, araçlar zaten aşağıda listeli) -->
+    <button class="nav-item-btn d-md-none" onclick="openMobileTools()">
+        <i class="bi bi-grid-3x3-gap-fill"></i>
+        <span class="nav-label">Araçlar</span>
+    </button>
+
+    <div class="nav-divider"></div>
+
+    <!-- Araçlar -->
+    <div class="nav-section desktop-only">Araçlar</div>
+    <button class="nav-item-btn desktop-only" onclick="openSummaryModal()">
+        <i class="bi bi-speedometer2"></i>
+        <span class="nav-label">Piyasa Özeti</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openGbCalcModal()">
+        <i class="bi bi-cash-coin"></i>
+        <span class="nav-label">GB Hesaplayıcı <span class="nav-badge new">Yeni</span></span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openProfitCalcModal()">
+        <i class="bi bi-calculator-fill"></i>
+        <span class="nav-label">Kâr Hesaplayıcı</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openBestDealsModal()">
+        <i class="bi bi-trophy-fill"></i>
+        <span class="nav-label">En İyi Fırsatlar <span class="nav-badge new">Yeni</span></span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openAlarmModal()">
+        <i class="bi bi-bell-fill"></i>
+        <span class="nav-label">Fiyat Alarmı</span>
+        <span class="nav-badge beta d-none" id="alarmBadgeCount">0</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openCompareModal()">
+        <i class="bi bi-bar-chart-steps"></i>
+        <span class="nav-label">Karşılaştır</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openFavoritesModal()">
+        <i class="bi bi-star-fill"></i>
+        <span class="nav-label">Favorilerim</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openExportModal()">
+        <i class="bi bi-download"></i>
+        <span class="nav-label">Dışa Aktar</span>
+    </button>
+
+    <div class="nav-divider desktop-only"></div>
+
+    <!-- Sistem -->
+    <div class="nav-section desktop-only">Sistem</div>
+    <button class="nav-item-btn desktop-only" onclick="toggleDensity()">
+        <i class="bi bi-arrows-collapse density-icon"></i>
+        <span class="nav-label">Görünüm Yoğunluğu</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="toggleSoundAlerts()">
+        <i class="bi bi-volume-mute-fill sound-icon"></i>
+        <span class="nav-label">Ses Uyarısı</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="toggleFullscreen()">
+        <i class="bi bi-fullscreen fs-icon" id="fsIcon"></i>
+        <span class="nav-label">Tam Ekran</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="requestNotifPerm()">
+        <i class="bi bi-bell-slash-fill notif-icon" id="notifIcon"></i>
+        <span class="nav-label">Bildirimler</span>
+    </button>
+    <button class="nav-item-btn desktop-only" onclick="openAboutModal()">
+        <i class="bi bi-info-circle-fill"></i>
+        <span class="nav-label">Hakkında</span>
+    </button>
+
+    <div class="nav-spacer"></div>
+
+    <!-- Alt durum -->
+    <div class="nav-stat desktop-only">
+        <span class="live-dot-sidebar"></span>
+        <span class="nav-label" style="color:var(--accent);font-size:0.7rem;">Canlı · <span id="sidebarSiteCount">-</span> Site</span>
+    </div>
+    <div class="nav-stat desktop-only">
+        <i class="bi bi-hdd-network" style="font-size:0.95rem;"></i>
+        <span class="nav-label" style="font-size:0.7rem;">8 Sunucu Aktif</span>
+    </div>
+    <div class="nav-stat desktop-only">
+        <i class="bi bi-clock-history" style="font-size:0.95rem;"></i>
+        <span class="nav-label" style="font-size:0.7rem;">Son: <span id="sidebarUpdateTime">-</span></span>
+    </div>
+</nav>
+
+<!-- Tam ekran modunda header/sidebar gizlendiğinde bile her zaman erişilebilir çıkış butonu -->
+<button type="button" id="fsExitBtn" class="fs-exit-btn" onclick="toggleFullscreen()" title="Tam ekrandan çık (Esc)">
+    <i class="bi bi-fullscreen-exit"></i>
+</button>
+
+<!-- ═══════════════ ANA İÇERİK ═══════════════ -->
+<main class="app-main container-fluid px-2 px-md-4 mt-3">
+
+    <!-- PAGE 1: CANLI FİYATLAR -->
+    <div id="pageDashboard">
+
+        <!-- KPI Kartları -->
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+                <div class="kpi-card" id="kpiCardServer">
+                    <div class="kpi-icon"><i class="bi bi-cpu"></i></div>
+                    <div class="kpi-text">
+                        <p class="kpi-title">Takip Edilen Sunucu</p>
+                        <p class="kpi-value soft-fade-text" id="currentTrackedServer" style="color:var(--accent);">8 Aktif Sunucu</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="kpi-card" id="kpiCardSell">
+                    <div class="kpi-icon" style="background:var(--buy-bg);color:var(--accent);border-color:var(--buy-border);"><i class="bi bi-cart-check"></i></div>
+                    <div class="kpi-text">
+                        <p class="kpi-title soft-fade-text" id="sellKpiTitle">En Düşük Satış (ZERO)</p>
+                        <p class="kpi-value soft-fade-text" id="topSellPrice" style="color:var(--accent);">--- TL</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="kpi-card" id="kpiCardBuy">
+                    <div class="kpi-icon" style="background:var(--sell-bg);color:var(--sell-text);border-color:var(--sell-border);"><i class="bi bi-graph-up-arrow"></i></div>
+                    <div class="kpi-text">
+                        <p class="kpi-title soft-fade-text" id="buyKpiTitle">En Yüksek Alış (ZERO)</p>
+                        <p class="kpi-value soft-fade-text" id="topBuyPrice" style="color:var(--sell-text);">--- TL</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tablo Kartı -->
+        <div class="glass-card">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div class="card-title-row mb-0">
+                    <div class="card-title-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+                    <div>
+                        <p class="card-title-text">Canlı Piyasa Fiyatları</p>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+                    <input type="text" id="siteSearchInput" class="form-control form-control-sm" placeholder="🔍 Site ara..." onkeyup="filterTable()" style="width:130px;">
+                    <div class="header-badge" style="font-size:0.68rem;">
+                        <i class="bi bi-arrow-repeat" style="color:var(--accent);"></i>
+                        <span id="updateTime" style="color:var(--text-muted);">{{ content['Güncelleme zamanı'] }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-glass-container smooth-scroll">
+                {% macro price_cell(site, server, side) -%}
+                {%- if site.get(server ~ ' stok', True) -%}
+                {{ site[server ~ ' ' ~ side] }}
+                {%- else -%}
+                <span class="stock-empty-icon" title="Stokta Yok"><i class="bi bi-slash-circle-fill"></i></span>
+                {%- endif -%}
+                {%- endmacro %}
+                <table class="table-custom" id="gbTable">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="min-width:110px;vertical-align:middle;text-align:left;padding-left:14px;">Site</th>
+                            <th rowspan="2" style="min-width:32px;vertical-align:middle;"><i class="bi bi-star" style="font-size:0.75rem;"></i></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">ZERO</span><span class="badge-animated">HOT 🔥</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">PANDORA</span><span class="badge-animated">HOT 🔥</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">AGARTHA</span><span class="badge-animated">HOT 🔥</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">FELIS</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">DRYADS</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">DESTAN</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">MINARK</span></th>
+                            <th colspan="2" class="server-header-cell"><span class="server-title">OREADS</span></th>
+                        </tr>
+                        <tr>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                            <th>Satış</th><th>Alış</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        {% for site in content['Veriler'] %}
+                        <tr>
+                            <td style="text-align:left;padding-left:14px;">
+                                <a href="{{ site['Site linki'] }}" target="_blank" class="site-link" title="{{ site['Site adı'] }}">
+                                    {% set logos = site_logos.get(site['Site adı']) %}
+                                    {% if logos %}
+                                    <img src="{{ url_for('static', filename='images/logos/' + logos['dark']) }}" class="site-logo-img logo-for-dark" alt="{{ site['Site adı'] }}">
+                                    <img src="{{ url_for('static', filename='images/logos/' + logos['light']) }}" class="site-logo-img logo-for-light" alt="{{ site['Site adı'] }}">
+                                    {% endif %}
+                                    <span class="visually-hidden">{{ site['Site adı'] }}</span>
+                                </a>
+                            </td>
+                            <td>
+                                <span class="fetch-status-dot {{ 'ok' if site['Veri Çekildi'] else 'fail' }}" title="{{ 'Veri başarıyla çekildi' if site['Veri Çekildi'] else 'Veri çekilemedi' }}"></span>
+                                <span class="fav-star" onclick="toggleFavorite(this,'{{ site['Site adı'] }}')"><i class="bi bi-star"></i></span>
+                            </td>
+                            <td>{{ price_cell(site, 'ZERO', 'satış') }}</td><td>{{ price_cell(site, 'ZERO', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'PANDORA', 'satış') }}</td><td>{{ price_cell(site, 'PANDORA', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'AGARTHA', 'satış') }}</td><td>{{ price_cell(site, 'AGARTHA', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'FELIS', 'satış') }}</td><td>{{ price_cell(site, 'FELIS', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'DRYADS', 'satış') }}</td><td>{{ price_cell(site, 'DRYADS', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'DESTAN', 'satış') }}</td><td>{{ price_cell(site, 'DESTAN', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'MINARK', 'satış') }}</td><td>{{ price_cell(site, 'MINARK', 'alış') }}</td>
+                            <td>{{ price_cell(site, 'OREADS', 'satış') }}</td><td>{{ price_cell(site, 'OREADS', 'alış') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Grafik Kartı -->
+        <div class="glass-card">
+            <div class="row g-2 mb-3 align-items-center">
+                <div class="col-12 col-md-3">
+                    <div class="card-title-row mb-0">
+                        <div class="card-title-icon" style="background:var(--sell-bg);color:var(--sell-text);border-color:var(--sell-border);"><i class="bi bi-graph-up"></i></div>
+                        <p class="card-title-text">Fiyat Trend Analizi</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-9 d-flex justify-content-md-end gap-1 flex-wrap align-items-center">
+                    <select id="serverSelect" class="form-select form-select-sm w-auto" onchange="onManualServerSelect()">
+                        <option value="ZERO">ZERO</option><option value="PANDORA">PANDORA</option>
+                        <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                        <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                        <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                    </select>
+                    <select id="siteSelect" class="form-select form-select-sm w-auto" onchange="updateChart()">
+                        <option value="ALL">Tüm Siteler</option>
+                        {% for site in content['Veriler'] %}
+                        <option value="{{ site['Site adı'] }}">{{ site['Site adı'] }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="hoursFilterSelect" class="form-select form-select-sm w-auto" onchange="updateChart()">
+                        <option value="all">Tüm Geçmiş</option>
+                        <option value="1">Son 1S</option><option value="3">Son 3S</option>
+                        <option value="6">Son 6S</option><option value="12">Son 12S</option>
+                        <option value="24">Son 24S</option>
+                    </select>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn-ghost active" onclick="setTimeframe('30m', this)">30D</button>
+                        <button type="button" class="btn-ghost" onclick="setTimeframe('1h', this)">1S</button>
+                        <button type="button" class="btn-ghost" onclick="setTimeframe('24h', this)">24S</button>
+                        <button type="button" class="btn-ghost" onclick="setTimeframe('7d', this)">7G</button>
+                    </div>
+                    <button type="button" class="btn-ghost p-1 px-2" id="chartCarouselBtn" onclick="toggleChartCarousel()" title="Sunucuyu otomatik değiştir"><i class="bi bi-pause-fill" id="chartCarouselIcon"></i></button>
+                    <button type="button" class="btn-ghost p-1 px-2" onclick="resetChart()" title="Sıfırla"><i class="bi bi-arrow-counterclockwise"></i></button>
+                </div>
+            </div>
+            <div style="height:280px;position:relative;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: PDF BAKİYE HAREKETLERİ -->
+    <div id="pagePdf" class="d-none">
+        <div class="glass-card">
+            <div class="card-title-row">
+                <div class="card-title-icon"><i class="bi bi-file-earmark-pdf-fill"></i></div>
+                <div>
+                    <p class="card-title-text">PDF Bakiye Hareketleri Yönetimi</p>
+                    <p class="card-title-sub">PDF yükleyerek bakiye hareketlerinizi analiz edin</p>
+                </div>
+            </div>
+
+            <div id="dropZone" class="p-4 text-center mb-3">
+                <i class="bi bi-cloud-arrow-up" style="font-size:2.8rem;color:var(--accent);display:block;margin-bottom:10px;"></i>
+                <p class="mt-1 mb-1 fw-bold" style="font-size:0.9rem;color:var(--text-main);">PDF Dosyanızı Buraya Bırakın</p>
+                <p class="mb-3" style="font-size:0.72rem;color:var(--text-muted);">veya cihazınızdan bir dosya seçin</p>
+                <input type="file" id="pdfFileInput" accept=".pdf" class="d-none">
+                <button type="button" class="btn-modern py-1 px-4" onclick="document.getElementById('pdfFileInput').click()">Dosya Seç</button>
+            </div>
+
+            <div id="pdfResultContainer" class="d-none">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-file-check" style="color:#22c55e;font-size:1rem;"></i>
+                        <span class="small fw-bold" style="color:var(--text-muted);" id="fileNameDisplay"></span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <input type="text" id="pdfTableSearch" class="form-control form-control-sm" placeholder="🔍 Ara..." onkeyup="applyPdfFilters()" style="width:130px;">
+                        <button class="btn-ghost btn-sm" onclick="resetPdfUpload()">Yeni Dosya</button>
+                    </div>
+                </div>
+
+                <div class="p-3 mb-3 rounded-3" style="background:var(--input-bg);border:1px solid var(--border);">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label mb-1 fw-bold" style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Başlangıç Tarihi</label>
+                            <input type="date" id="startDateFilter" class="form-control form-control-sm" onchange="applyPdfFilters()">
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label mb-1 fw-bold" style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;">Bitiş Tarihi</label>
+                            <input type="date" id="endDateFilter" class="form-control form-control-sm" onchange="applyPdfFilters()">
+                        </div>
+                        <div class="col-12 col-md-6 d-flex justify-content-md-end gap-2 flex-wrap">
+                            <button class="btn-ghost btn-sm" onclick="clearDateFilter()"><i class="bi bi-x-circle me-1"></i>Temizle</button>
+                            <button class="btn-ghost btn-sm" id="copyBtn" onclick="copyTableToClipboard()"><i class="bi bi-clipboard me-1"></i>Kopyala</button>
+                            <button class="btn-modern btn-sm" onclick="exportFilteredData('excel')"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-glass-container smooth-scroll">
+                    <table class="table-custom" id="parsedPdfTable">
+                        <thead>
+                            <tr>
+                                <th style="width:35px;"><i class="bi bi-check2-square"></i></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'idDropdown')">ID <i class="bi bi-funnel-fill"></i><div id="idDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>ID</span><a href="#" onclick="toggleSelectAll(event, 'idDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="idCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'tarihDropdown')">Tarih <i class="bi bi-funnel-fill"></i><div id="tarihDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Tarih</span><a href="#" onclick="toggleSelectAll(event, 'tarihDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="tarihCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'tipDropdown')">Tip <i class="bi bi-funnel-fill"></i><div id="tipDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Tip</span><a href="#" onclick="toggleSelectAll(event, 'tipDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="tipCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'tutarDropdown')">Tutar <i class="bi bi-funnel-fill"></i><div id="tutarDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Tutar</span><a href="#" onclick="toggleSelectAll(event, 'tutarDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="tutarCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'oncekiDropdown')">Önc. B. <i class="bi bi-funnel-fill"></i><div id="oncekiDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Önc. B.</span><a href="#" onclick="toggleSelectAll(event, 'oncekiDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="oncekiCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'sonrakiDropdown')">Sonr. B. <i class="bi bi-funnel-fill"></i><div id="sonrakiDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Sonr. B.</span><a href="#" onclick="toggleSelectAll(event, 'sonrakiDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="sonrakiCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'durumDropdown')">Durum <i class="bi bi-funnel-fill"></i><div id="durumDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Durum</span><a href="#" onclick="toggleSelectAll(event, 'durumDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="durumCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                                <th class="excel-th" onclick="toggleExcelFilter(event, 'aciklamaDropdown')">Açıklama <i class="bi bi-funnel-fill"></i><div id="aciklamaDropdown" class="excel-filter-dropdown" onclick="event.stopPropagation()"><div class="fw-bold mb-2 pb-1 border-bottom d-flex justify-content-between" style="border-color:var(--border)!important;color:var(--text-main);"><span>Açıklama</span><a href="#" onclick="toggleSelectAll(event, 'aciklamaDropdown', true)" class="small text-decoration-none" style="color:var(--accent);">Tümü</a></div><div id="aciklamaCheckboxes" class="excel-filter-list"></div><button class="btn-modern w-100 py-1" onclick="applyPdfFilters()">Uygula</button></div></th>
+                            </tr>
+                        </thead>
+                        <tbody id="parsedPdfTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="pdfPaginationContainer" class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- ═══════════════ MODALLER ═══════════════ -->
+
+<!-- Piyasa Özeti Modal -->
+<div class="modal fade" id="summaryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-speedometer2 me-2" style="color:var(--accent);"></i>Piyasa Özeti</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="summaryContent">
+                    <p style="color:var(--text-muted);font-size:0.85rem;">Tüm sunucuların anlık fiyat karşılaştırması aşağıda listelenmektedir.</p>
+                    <div class="table-glass-container smooth-scroll mt-2">
+                        <table class="compare-table" id="summaryTable">
+                            <thead>
+                                <tr>
+                                    <th>Sunucu</th>
+                                    <th>Min Satış</th>
+                                    <th>Max Alış</th>
+                                    <th>Spread</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost btn-sm" data-bs-dismiss="modal">Kapat</button>
+                <button class="btn-modern btn-sm" onclick="buildSummaryTable()"><i class="bi bi-arrow-repeat me-1"></i>Yenile</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GB Hesaplayıcı Modal -->
+<div class="modal fade" id="gbCalcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2" style="color:var(--accent);"></i>GB Hesaplayıcı</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Sunucuyu seçin, ister GB miktarı ister TL tutarı girin — tüm sitelerin sonucu ve aradaki fark anında hesaplanır.</p>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Sunucu</label>
+                        <select id="gbCalcServer" class="form-select form-select-sm" onchange="calculateGbAmounts()">
+                            <option value="ZERO">ZERO</option><option value="PANDORA">PANDORA</option>
+                            <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                            <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                            <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;" id="gbCalcAmountLabel">GB Miktarı</label>
+                        <div class="d-flex gap-1">
+                            <input type="number" id="gbCalcAmount" class="form-control form-control-sm" value="100" min="0" step="1" oninput="calculateGbAmounts()">
+                            <select id="gbCalcMode" class="form-select form-select-sm w-auto" onchange="calculateGbAmounts()">
+                                <option value="amount">GB</option>
+                                <option value="total">TL</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-glass-container smooth-scroll">
+                    <table class="compare-table" id="gbCalcTable">
+                        <thead>
+                            <tr><th style="text-align:left;">Site</th><th>Alış (Birim)</th><th>Satış (Birim)</th><th id="gbCalcCol4">Toplam Alış</th><th id="gbCalcCol5">Toplam Satış</th><th id="gbCalcCol6">Fark</th></tr>
+                        </thead>
+                        <tbody id="gbCalcTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="mt-3 p-3 rounded-3" style="background:var(--input-bg);border:1px solid var(--border);">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <span style="font-size:0.78rem;color:var(--text-muted);"><span id="gbCalcMaxBuyLabel">En Yüksek Alış</span>: <strong id="gbCalcMaxBuy" style="color:var(--sell-text);">---</strong></span>
+                        <span style="font-size:0.78rem;color:var(--text-muted);"><span id="gbCalcMaxSellLabel">En Yüksek Satış</span>: <strong id="gbCalcMaxSell" style="color:var(--buy-text);">---</strong></span>
+                        <span style="font-size:0.78rem;color:var(--text-muted);">Aradaki Fark: <strong id="gbCalcMaxDiff" style="color:var(--accent);">---</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kâr Hesaplayıcı Modal -->
+<div class="modal fade" id="profitModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-calculator-fill me-2" style="color:var(--accent);"></i>Kâr Hesaplayıcı</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Bir sunucuyu seçin, tablodan en iyi fiyatları otomatik getirin veya kendi rakamlarınızı girip olası kârınızı anında görün.</p>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Sunucu</label>
+                        <select id="profitServer" class="form-select form-select-sm" onchange="autoFillProfitFromTable()">
+                            <option value="ZERO">ZERO</option><option value="PANDORA">PANDORA</option>
+                            <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                            <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                            <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Miktar (Adet)</label>
+                        <input type="number" id="profitQty" class="form-control form-control-sm" value="1" min="1" step="1" oninput="calculateProfit()">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Alım Fiyatınız (TL/Adet)</label>
+                        <input type="number" id="profitBuyPrice" class="form-control form-control-sm" placeholder="0.00" step="0.01" oninput="calculateProfit()">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Satım Fiyatınız (TL/Adet)</label>
+                        <input type="number" id="profitSellPrice" class="form-control form-control-sm" placeholder="0.00" step="0.01" oninput="calculateProfit()">
+                    </div>
+                </div>
+                <button class="btn-ghost w-100 mb-3" onclick="autoFillProfitFromTable()"><i class="bi bi-magic me-1"></i>Tablodan En İyi Fiyatları Getir</button>
+                <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;">
+                    <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-muted);font-size:0.78rem;">Toplam Maliyet</span><span id="profitCost" style="font-weight:800;color:var(--text-main);">0.00 TL</span></div>
+                    <div class="d-flex justify-content-between mb-2"><span style="color:var(--text-muted);font-size:0.78rem;">Toplam Getiri</span><span id="profitRevenue" style="font-weight:800;color:var(--text-main);">0.00 TL</span></div>
+                    <div class="d-flex justify-content-between"><span style="color:var(--text-muted);font-size:0.78rem;">Net Kâr / Yüzde</span><span id="profitNet" style="font-weight:900;">0.00 TL (0%)</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- En İyi Fırsatlar Modal -->
+<div class="modal fade" id="bestDealsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-trophy-fill me-2" style="color:#fbbf24;"></i>En İyi Fırsatlar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.85rem;">Sunucular, mevcut arbitraj potansiyeline (en ucuz alım ile en yüksek satım arasındaki farka) göre büyükten küçüğe sıralanmıştır.</p>
+                <div class="table-glass-container smooth-scroll mt-2">
+                    <table class="compare-table" id="bestDealsTable">
+                        <thead>
+                            <tr><th>#</th><th>Sunucu</th><th>En Ucuz Alım</th><th>En Yüksek Satım</th><th>Potansiyel Fark</th></tr>
+                        </thead>
+                        <tbody id="bestDealsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost btn-sm" data-bs-dismiss="modal">Kapat</button>
+                <button class="btn-modern btn-sm" onclick="buildBestDeals()"><i class="bi bi-arrow-repeat me-1"></i>Yenile</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fiyat Alarmı Modal -->
+<div class="modal fade" id="alarmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bell-fill me-2" style="color:var(--accent);"></i>Fiyat Alarmı</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Belirli bir fiyat seviyesine ulaşıldığında tarayıcı bildirimi alın.</p>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Sunucu</label>
+                        <select id="alarmServer" class="form-select form-select-sm">
+                            <option value="ZERO">ZERO</option><option value="PANDORA">PANDORA</option>
+                            <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                            <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                            <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Tip</label>
+                        <select id="alarmType" class="form-select form-select-sm">
+                            <option value="sell">Satış Fiyatı</option>
+                            <option value="buy">Alış Fiyatı</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Koşul</label>
+                        <select id="alarmCondition" class="form-select form-select-sm">
+                            <option value="below">Altına Düşünce</option>
+                            <option value="above">Üzerine Çıkınca</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Hedef Fiyat (TL)</label>
+                        <input type="number" id="alarmPrice" class="form-control form-control-sm" placeholder="örn: 150.00" step="0.01">
+                    </div>
+                </div>
+                <button class="btn-modern w-100 py-2" onclick="addAlarm()"><i class="bi bi-plus-circle me-1"></i>Alarm Ekle</button>
+                <div id="alarmList" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Karşılaştırma Modal -->
+<div class="modal fade" id="compareModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bar-chart-steps me-2" style="color:var(--accent);"></i>Sunucu Karşılaştırma</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Sunucu A</label>
+                        <select id="compareServerA" class="form-select form-select-sm">
+                            <option value="ZERO">ZERO</option><option value="PANDORA">PANDORA</option>
+                            <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                            <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                            <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label mb-1" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Sunucu B</label>
+                        <select id="compareServerB" class="form-select form-select-sm">
+                            <option value="ZERO">ZERO</option><option value="PANDORA" selected>PANDORA</option>
+                            <option value="AGARTHA">AGARTHA</option><option value="FELIS">FELIS</option>
+                            <option value="DRYADS">DRYADS</option><option value="DESTAN">DESTAN</option>
+                            <option value="MINARK">MINARK</option><option value="OREADS">OREADS</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn-modern w-100 py-2 mb-3" onclick="buildCompareTable()"><i class="bi bi-bar-chart-steps me-1"></i>Karşılaştır</button>
+                <div class="table-glass-container smooth-scroll">
+                    <table class="compare-table" id="compareTable">
+                        <thead><tr><th>Site</th><th id="compareHeadA">A</th><th id="compareHeadB">B</th><th>Fark</th></tr></thead>
+                        <tbody id="compareTableBody"><tr><td colspan="4" style="color:var(--text-muted);padding:20px;text-align:center;">Yukarıdan sunucu seçip Karşılaştır'a basın.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Favoriler Modal -->
+<div class="modal fade" id="favoritesModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-star-fill me-2" style="color:#fbbf24;"></i>Favorilerim</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="favoritesContent" style="color:var(--text-muted);font-size:0.85rem;">Henüz favori eklenmedi. Tablodaki yıldız ikonuna tıklayarak site ekleyebilirsiniz.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dışa Aktar Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-download me-2" style="color:var(--accent);"></i>Tabloyu Dışa Aktar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px;">Canlı fiyat tablosunu (aktif arama/filtre uygulanmış haliyle) istediğiniz formatta dışa aktarın.</p>
+                <div class="d-grid gap-2">
+                    <button class="btn-modern py-2" onclick="exportMainTableExcel()"><i class="bi bi-file-earmark-excel-fill me-2"></i>Excel (.xlsx) Olarak İndir</button>
+                    <button class="btn-ghost py-2" onclick="exportMainTableCSV()"><i class="bi bi-filetype-csv me-2"></i>CSV Olarak İndir</button>
+                    <button class="btn-ghost py-2" onclick="copyMainTableToClipboard()"><i class="bi bi-clipboard-check me-2"></i>Panoya Kopyala</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobil Araçlar Sheet -->
+<div class="modal fade" id="mobileToolsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--accent);"></i>Araçlar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="tool-grid">
+                    <button class="tool-tile" onclick="launchToolFromMobile('openSummaryModal')"><i class="bi bi-speedometer2"></i><span>Piyasa Özeti</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openGbCalcModal')"><i class="bi bi-cash-coin"></i><span>GB Hesaplayıcı</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openProfitCalcModal')"><i class="bi bi-calculator-fill"></i><span>Kâr Hesaplayıcı</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openBestDealsModal')"><i class="bi bi-trophy-fill"></i><span>En İyi Fırsatlar</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openAlarmModal')"><i class="bi bi-bell-fill"></i><span>Fiyat Alarmı</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openCompareModal')"><i class="bi bi-bar-chart-steps"></i><span>Karşılaştır</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openFavoritesModal')"><i class="bi bi-star-fill"></i><span>Favorilerim</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openExportModal')"><i class="bi bi-download"></i><span>Dışa Aktar</span></button>
+                    <button class="tool-tile" onclick="toggleDensity()"><i class="bi bi-arrows-collapse density-icon"></i><span>Görünüm</span></button>
+                    <button class="tool-tile" onclick="toggleSoundAlerts()"><i class="bi bi-volume-mute-fill sound-icon"></i><span>Ses Uyarısı</span></button>
+                    <button class="tool-tile" onclick="toggleFullscreen()"><i class="bi bi-fullscreen fs-icon"></i><span>Tam Ekran</span></button>
+                    <button class="tool-tile" onclick="requestNotifPerm()"><i class="bi bi-bell-slash-fill notif-icon"></i><span>Bildirimler</span></button>
+                    <button class="tool-tile" onclick="launchToolFromMobile('openAboutModal')"><i class="bi bi-info-circle-fill"></i><span>Hakkında</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hakkında Modal -->
+<div class="modal fade" id="aboutModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle-fill me-2" style="color:var(--accent);"></i>ZenX Hakkında</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <svg width="56" height="56" viewBox="0 0 38 38" fill="none" style="margin-bottom:14px;filter:drop-shadow(0 0 12px var(--accent));">
+                    <defs>
+                        <linearGradient id="alg1" x1="4" y1="30" x2="34" y2="6" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="var(--accent)"/>
+                            <stop offset="100%" stop-color="var(--accent2)"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="38" height="38" rx="11" fill="url(#alg1)" opacity="0.20"/>
+                    <path d="M6 27l6-6 5 4 6-9 6-7" stroke="url(#alg1)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="21" r="1.6" fill="var(--accent)"/>
+                    <circle cx="17" cy="25" r="1.6" fill="var(--accent)"/>
+                    <circle cx="23" cy="16" r="1.6" fill="var(--accent2)"/>
+                    <circle cx="29" cy="9" r="2.6" fill="var(--accent2)" opacity="0.95"/>
+                </svg>
+                <h4 style="font-weight:900;color:var(--text-main);margin-bottom:4px;">Zen<span style="background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-style:italic;">X</span></h4>
+                <p style="font-size:0.72rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:2px;margin-bottom:16px;">KO GB Live Tracker</p>
+                <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;text-align:left;font-size:0.82rem;color:var(--text-muted);">
+                    <div class="d-flex justify-content-between mb-2"><span>Versiyon</span><span style="color:var(--accent);font-weight:700;">v2.1</span></div>
+                    <div class="d-flex justify-content-between mb-2"><span>Tema</span><span id="aboutTheme" style="color:var(--text-main);font-weight:700;">Cyber</span></div>
+                    <div class="d-flex justify-content-between mb-2"><span>Sunucu Sayısı</span><span style="color:var(--text-main);font-weight:700;">8</span></div>
+                    <div class="d-flex justify-content-between"><span>Yenileme Aralığı</span><span id="aboutRefresh" style="color:var(--text-main);font-weight:700;">30s</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-ghost btn-sm" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
