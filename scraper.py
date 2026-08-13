@@ -343,7 +343,7 @@ def fetch_oyuneks_data(default_links, page):
 
   try:
     page.goto(default_links["OYUNEKS"], timeout=30000, wait_until="domcontentloaded")
-    page.wait_for_selector(".productCard", timeout=15000)
+    page.wait_for_selector(".productCard", timeout=30000)
 
     for card_text in page.locator(".productCard").all_inner_texts():
       flat = " ".join(card_text.split())
