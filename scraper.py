@@ -177,13 +177,45 @@ def fetch_sonteklif_data(default_links):
   return site_data
 
 
-def fetch_bynogame_data(default_links):
+def fetch_bynogame_via_enucuzgb(page):
+  """Bynogame'in kendi sitesi bazı barındırma ortamlarının (ör. Render) veri
+  merkezi IP'lerini 403 ile engelliyor. Bu durumda, EnUcuzGB.com'un
+  karşılaştırma tablosundaki Bynogame satırından aynı veriyi (stok bilgisi
+  hariç) çekiyoruz. Tablo sütun sırası sabit: ZERO, FELIS, AGARTHA, PANDORA,
+  DRYADS, DESTAN, MINARK, OREADS (SERVER_NAMES ile birebir aynı sıra), her
+  sunucu için [Satış, Alış] hücre çifti; ilk hücre logo/link olduğu için
+  atlanıyor."""
+  site_data = {}
+  try:
+    page.goto("https://www.enucuzgb.com/", timeout=30000, wait_until="domcontentloaded")
+    page.wait_for_timeout(4000)  # Cloudflare doğrulaması + yönlendirme için bekle
+    page.wait_for_selector("table tbody tr", timeout=15000)
+
+    row = page.locator("tbody tr").filter(has=page.locator("img[src*='BYNO.png']")).first
+    cells = row.locator("th, td").all_inner_texts()[1:]
+
+    for i, server in enumerate(SERVER_NAMES):
+      site_data[f"{server} satış"] = cells[i * 2].strip()
+      site_data[f"{server} alış"] = cells[i * 2 + 1].strip()
+
+    if len(site_data) > 0:
+      site_data["Veri Çekildi"] = True
+    print("Bynogame verileri EnUcuzGB üzerinden alındı.")
+  except Exception as e:
+    print(f"Bynogame (EnUcuzGB fallback) hatası: {e}")
+
+  return site_data
+
+
+def fetch_bynogame_data(default_links, page):
   """Bynogame: satış fiyatı ins-product-price attribute'unda, alış fiyatı
   'X TL'den BİZE SAT' metninde. Site kendi sayfasında zaten tablonun referans
   birimiyle (KnightPin/Kopazar ile aynı ölçek) uyumlu, ek ölçekleme gerekmiyor.
   Her ürün kartının <article> etiketi data-stock="0"/"1" taşıyor (JS tarafında
   'is_stock != 0 ? stokta değil : stokta' olarak kullanılıyor); 0 dışı bir değer
-  tükendi anlamına geliyor, bunu da '{server} stok' olarak çekiyoruz."""
+  tükendi anlamına geliyor, bunu da '{server} stok' olarak çekiyoruz.
+  Direkt istek engellenirse (403 vb.) EnUcuzGB.com üzerinden fallback dener
+  (stok bilgisi olmadan)."""
   site_data = {
       "Site adı": "BYNOGAME",
       "Site linki": default_links["BYNOGAME"],
@@ -213,6 +245,9 @@ def fetch_bynogame_data(default_links):
     print("Bynogame verileri başarıyla alındı.")
   except Exception as e:
     print(f"Bynogame hatası: {e}")
+    fallback = fetch_bynogame_via_enucuzgb(page)
+    if fallback.get("Veri Çekildi"):
+      site_data.update(fallback)
 
   return site_data
 
@@ -432,12 +467,16 @@ def fetch_gb_data():
     # --- Oyuneks: düz istekleri 403 ile engelliyor, tarayıcı gerekiyor ---
     merge_site(fetch_oyuneks_data(default_links, page))
 
+    # --- Bynogame: normalde düz istekle çekilir, sadece 403 durumunda
+    # (ör. bazı barındırma ortamlarının veri merkezi IP'si engellendiğinde)
+    # zaten açık olan tarayıcı sayfasıyla EnUcuzGB üzerinden fallback dener ---
+    merge_site(fetch_bynogame_data(default_links, page))
+
     browser.close()
 
   # --- Geri kalanlar düz HTTP isteğiyle çekilebiliyor, tarayıcı gerekmiyor ---
   merge_site(fetch_kopazar_data(default_links))
   merge_site(fetch_sonteklif_data(default_links))
-  merge_site(fetch_bynogame_data(default_links))
   merge_site(fetch_kabasakal_data(default_links))
   merge_site(fetch_gamesatis_data(default_links))
   merge_site(fetch_oyunfor_data(default_links))
