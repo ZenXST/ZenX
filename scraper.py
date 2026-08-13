@@ -187,7 +187,7 @@ def fetch_bynogame_via_enucuzgb(page):
   atlanıyor."""
   site_data = {}
   try:
-    page.goto("https://www.enucuzgb.com/", timeout=30000, wait_until="domcontentloaded")
+    page.goto("https://www.enucuzgb.com/", timeout=10000, wait_until="domcontentloaded")
     page.wait_for_timeout(4000)  # Cloudflare doğrulaması + yönlendirme için bekle
     page.wait_for_selector("table tbody tr", timeout=15000)
 
@@ -378,7 +378,7 @@ def fetch_oyuneks_data(default_links, page):
 
   try:
     page.goto(default_links["OYUNEKS"], timeout=30000, wait_until="domcontentloaded")
-    page.wait_for_selector(".productCard", timeout=30000)
+    page.wait_for_selector(".productCard", timeout=15000)
 
     for card_text in page.locator(".productCard").all_inner_texts():
       flat = " ".join(card_text.split())
