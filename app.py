@@ -11,6 +11,7 @@ from pypdf import PdfReader
 from scraper import fetch_gb_data
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # 15 MB - internete acik oldugu icin buyuk dosya DoS'unu engeller
 
 DATA_FILE = "data.json"
 HISTORY_FILE = "price_history.json"
