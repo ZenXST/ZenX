@@ -81,6 +81,10 @@ document.addEventListener("DOMContentLoaded", function() {
     initDropzone();
     startServerCarousel();
     renderAlarmList();
+    startLiveClock();
+
+    var footerYearEl = document.getElementById('footerYear');
+    if (footerYearEl) footerYearEl.textContent = new Date().getFullYear();
 
     var initialUpdateTime = document.getElementById('updateTime');
     var sidebarTimeEl = document.getElementById('sidebarUpdateTime');
@@ -367,6 +371,16 @@ function syncData() {
             }
         })
         .catch(function(err){ console.error("Senkronizasyon hatası:", err); });
+}
+
+function startLiveClock() {
+    var el = document.getElementById('liveClock');
+    if (!el) return;
+    function tick() {
+        el.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    tick();
+    setInterval(tick, 1000);
 }
 
 function startCountdown() {

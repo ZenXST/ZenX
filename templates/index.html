@@ -52,7 +52,7 @@
             <div class="brand-name">
                 <span class="zen">Zen</span><span class="x-letter">X</span>
             </div>
-            <span class="brand-tagline">KO GB Live Tracker</span>
+            <span class="brand-tagline">Canlı GB Fiyat Takip</span>
         </div>
     </a>
 
@@ -73,6 +73,11 @@
             <option value="60">1m</option>
             <option value="180">3m</option>
         </select>
+
+        <div class="timer-badge" id="liveClockBadge" title="Güncel saat">
+            <i class="bi bi-clock" style="color:var(--accent);font-size:0.8rem;"></i>
+            <span id="liveClock">--:--:--</span>
+        </div>
 
         <div class="timer-badge">
             <i class="bi bi-clock-history" style="color:var(--accent);font-size:0.8rem;"></i>
@@ -104,7 +109,7 @@
         <i class="bi bi-grid-1x2-fill"></i>
         <span class="nav-label">Canlı Fiyatlar</span>
     </button>
-    <button class="nav-item-btn" id="navBtnPdf" onclick="switchPage('pdf')">
+    <button class="nav-item-btn nav-item-disabled" id="navBtnPdf" disabled aria-disabled="true">
         <i class="bi bi-file-earmark-pdf-fill"></i>
         <span class="nav-label">Bakiye Hareketleri</span>
     </button>
@@ -436,6 +441,10 @@
     </div>
 
 </main>
+
+<footer class="app-footer">
+    <p>&copy; <span id="footerYear"></span> ZenX. Tüm hakları saklıdır.</p>
+</footer>
 
 <!-- ═══════════════ MODALLER ═══════════════ -->
 
