@@ -354,6 +354,8 @@ function refreshData() {
             if (result.status === 'success') {
                 renderRefreshedData(result.data);
                 showToast('Veriler güncellendi', 'bi-check-circle-fill', 'var(--accent)');
+            } else if (result.status === 'cooldown') {
+                showToast(result.message, 'bi-hourglass-split', 'var(--text-muted)');
             }
         })
         .catch(function(err){ console.error("Güncelleme hatası:", err); });
