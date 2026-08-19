@@ -50,6 +50,23 @@ function escapeHtml(text) {
     return String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 }
 
+var _xlsxLoadPromise = null;
+function ensureXLSX(callback) {
+    if (typeof XLSX !== 'undefined') { callback(); return; }
+    if (!_xlsxLoadPromise) {
+        _xlsxLoadPromise = new Promise(function(resolve, reject) {
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+            s.onload = resolve;
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    }
+    _xlsxLoadPromise.then(callback).catch(function() {
+        showToast('XLSX kütüphanesi yüklenemedi', 'bi-exclamation-triangle-fill', 'var(--sell-text)');
+    });
+}
+
 function showToast(msg, icon, color) {
     icon = icon || 'bi-check-circle-fill';
     color = color || 'var(--accent)';
@@ -81,6 +98,10 @@ document.addEventListener("DOMContentLoaded", function() {
     initDropzone();
     startServerCarousel();
     renderAlarmList();
+    startLiveClock();
+
+    var footerYearEl = document.getElementById('footerYear');
+    if (footerYearEl) footerYearEl.textContent = new Date().getFullYear();
 
     var initialUpdateTime = document.getElementById('updateTime');
     var sidebarTimeEl = document.getElementById('sidebarUpdateTime');
@@ -350,6 +371,8 @@ function refreshData() {
             if (result.status === 'success') {
                 renderRefreshedData(result.data);
                 showToast('Veriler güncellendi', 'bi-check-circle-fill', 'var(--accent)');
+            } else if (result.status === 'cooldown') {
+                showToast(result.message, 'bi-hourglass-split', 'var(--text-muted)');
             }
         })
         .catch(function(err){ console.error("Güncelleme hatası:", err); });
@@ -367,6 +390,16 @@ function syncData() {
             }
         })
         .catch(function(err){ console.error("Senkronizasyon hatası:", err); });
+}
+
+function startLiveClock() {
+    var el = document.getElementById('liveClock');
+    if (!el) return;
+    function tick() {
+        el.textContent = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    tick();
+    setInterval(tick, 1000);
 }
 
 function startCountdown() {
@@ -701,12 +734,13 @@ function openExportModal() {
 }
 
 function exportMainTableExcel() {
-    if (typeof XLSX === 'undefined') { showToast('XLSX kütüphanesi yüklenmedi', 'bi-exclamation-triangle-fill', 'var(--sell-text)'); return; }
-    var table = document.getElementById('gbTable');
-    if (!table) return;
-    var wb = XLSX.utils.table_to_book(table, { sheet: 'Canlı Fiyatlar' });
-    XLSX.writeFile(wb, 'ZenX_Canli_Fiyatlar.xlsx');
-    showToast('Excel dosyası indiriliyor...', 'bi-file-earmark-excel-fill', '#22c55e');
+    ensureXLSX(function() {
+        var table = document.getElementById('gbTable');
+        if (!table) return;
+        var wb = XLSX.utils.table_to_book(table, { sheet: 'Canlı Fiyatlar' });
+        XLSX.writeFile(wb, 'ZenX_Canli_Fiyatlar.xlsx');
+        showToast('Excel dosyası indiriliyor...', 'bi-file-earmark-excel-fill', '#22c55e');
+    });
 }
 
 function exportMainTableCSV() {
@@ -1187,10 +1221,11 @@ function copyTableToClipboard() {
 }
 
 function exportFilteredData() {
-    if (typeof XLSX === 'undefined') return;
-    var ws = XLSX.utils.json_to_sheet(filteredTransactionsData);
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Bakiye");
-    XLSX.writeFile(wb, "Bakiye_Hareketleri.xlsx");
-    showToast('Excel dosyası indiriliyor...', 'bi-file-earmark-excel-fill', '#22c55e');
+    ensureXLSX(function() {
+        var ws = XLSX.utils.json_to_sheet(filteredTransactionsData);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bakiye");
+        XLSX.writeFile(wb, "Bakiye_Hareketleri.xlsx");
+        showToast('Excel dosyası indiriliyor...', 'bi-file-earmark-excel-fill', '#22c55e');
+    });
 }

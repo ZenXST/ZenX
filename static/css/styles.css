@@ -438,6 +438,12 @@
             background: var(--accent);
         }
 
+        .nav-item-btn.nav-item-disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         /* Badge yan etiket */
         .nav-badge {
             font-size: 0.56rem; font-weight: 700; letter-spacing: 0.3px;
@@ -838,6 +844,15 @@
         font-size: 0.74rem; font-weight: 600; color: var(--text-muted);
     }
     .timer-badge #countdown { color: var(--accent); font-variant-numeric: tabular-nums; }
+    #liveClockBadge #liveClock { color: var(--text-main); font-variant-numeric: tabular-nums; font-weight: 700; }
+
+    .app-footer {
+        text-align: center;
+        padding: 22px 12px;
+        color: var(--text-dim);
+        font-size: 0.72rem;
+        letter-spacing: 0.3px;
+    }
 
     /* ═══════════════════════════════════════════
        CARD BAŞLIK STİLİ

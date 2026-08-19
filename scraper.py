@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-KNIGHTPIN_API_KEY = os.environ.get("KNIGHTPIN_API_KEY") or "9c513f9408e6aff893424f77afd452659c09ad4dd3448bdd"
+KNIGHTPIN_API_KEY = os.environ.get("KNIGHTPIN_API_KEY")
 KNIGHTPIN_API_URL = "https://knightpin.com/ajax/gold-price-api.php?game=ko&format=raw"
 
 BROWSER_UA = (

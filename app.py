@@ -11,10 +11,13 @@ from pypdf import PdfReader
 from scraper import fetch_gb_data
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # 15 MB - internete acik oldugu icin buyuk dosya DoS'unu engeller
 
 DATA_FILE = "data.json"
 HISTORY_FILE = "price_history.json"
 AUTO_REFRESH_SECONDS = 180  # ~3 dakika
+MANUAL_REFRESH_COOLDOWN_SECONDS = 20  # Siteye açık endpoint'in kötüye kullanımını önler
+_last_manual_refresh = 0.0
 
 SITE_LOGOS = {
     "KNIGHTPIN": {"dark": "knightpin_dark.png", "light": "knightpin_light.png"},
@@ -178,7 +181,20 @@ def api_data():
 
 @app.route("/api/refresh")
 def api_refresh():
-  """Manuel "Yenile" tıklamasıyla tetiklenen, gerçek bir tarama yapan endpoint."""
+  """Manuel "Yenile" tıklamasıyla tetiklenen, gerçek bir tarama yapan endpoint.
+  Site artık internete açık olduğu için, art arda çağrılarla scraper'ı ve
+  hedef siteleri yormamak adına kısa bir bekleme süresi (cooldown) uygulanır."""
+  global _last_manual_refresh
+  now = time.time()
+  remaining = MANUAL_REFRESH_COOLDOWN_SECONDS - (now - _last_manual_refresh)
+  if remaining > 0:
+    return jsonify({
+        "status": "cooldown",
+        "message": f"Çok sık istek. {int(remaining) + 1} saniye sonra tekrar deneyin.",
+        "data": load_data(),
+    }), 429
+  _last_manual_refresh = now
+
   try:
     data = refresh_and_save()
     return jsonify({"status": "success", "data": data})
@@ -464,4 +480,4 @@ def api_chart_data():
 start_auto_refresh()
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True, use_reloader=False)
+  app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False, use_reloader=False)

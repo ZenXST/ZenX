@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+venv/
 _tema_yedek_*/
 _tasarim_yedek_oncesi_*/
 data.json
