@@ -160,9 +160,14 @@ def fetch_sonteklif_data(default_links):
       # Site "Alış:"/"Satış:" etiketlerini "BİZE SAT"/"SATIN AL" olarak
       # değiştirdi (2026-08-12 civarı); [İI] ile Türkçe noktalı İ'yi de kabul
       # ediyoruz (bkz. oyunfor için SERVER_UPPER_PATTERN'deki aynı sorun).
+      # re.S (DOTALL) şart: get_text(" ") site HTML'inin girinti boşluklarını
+      # bazı satırlarda gerçek \n karakteri olarak koruyor (ör. Dryads'da
+      # "Gold Bar" ile "BİZE SAT" arasına düşüyor) - re.S olmadan "." bu
+      # satır sonunu geçemediği için o sunucular sessizce eşleşmiyordu.
       m = re.search(
           rf"{tr_name} Gold Bar.*?B[İI]ZE SAT\s*([\d.,]+)\s*TL.*?SATIN AL\s*([\d.,]+)\s*TL",
           text,
+          re.S,
       )
       if m:
         site_data[f"{server} alış"] = _fmt(float(m.group(1).replace(",", ".")) * 10)
